@@ -1,0 +1,8 @@
+#!/bin/bash
+
+clang opengl.c src/glad.c -ldl -lGL -lglfw -pedantic-errors -Wall -Werror -o game
+if [ $? -eq 0 ]; then
+    ./game
+else
+    echo "Program did not compile, not executing :/"
+fi
