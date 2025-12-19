@@ -1,8 +1,15 @@
 #!/bin/bash
-
-clang opengl.c src/glad.c -ldl -lGL -lglfw -pedantic-errors -Wall -Werror -o game
-if [ $? -eq 0 ]; then
-    ./game
+link_flags=" -lGL -lglfw"
+error_flags=" -pedantic-errors -Wall -Werror"
+compile_flags=" opengl.c src/glad.c $link_flags $error_flags -o game"
+if [ -z $1 ]; then
+    clang $compile_flags
+    if [ $? -eq 0 ]; then
+        ./game
+    else
+        echo "Program did not compile, not executing :/"
+    fi
 else
-    echo "Program did not compile, not executing :/"
+    clang $compile_flags
 fi
+
