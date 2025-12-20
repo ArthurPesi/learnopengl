@@ -77,32 +77,7 @@ int main(void) {
 
     uint32_t vertexShader = pesiLoadAndCompileShader(GL_VERTEX_SHADER, "vertex.glsl");
     uint32_t fragmentShader = pesiLoadAndCompileShader(GL_FRAGMENT_SHADER, "fragment.glsl");
-    // uint32_t vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    // assert( vertexShader != 0 );
-    //
-    // glShaderSource(vertexShader, 1, &vertexShaderText, NULL);
-    // glCompileShader(vertexShader);
-    //
-    // int32_t success;//TODO: bool32
-    // glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    // if(!success) {
-    //     char infoLog[512] = "Error during vertex shader compilation ";
-    //     glGetShaderInfoLog(vertexShader, 472, NULL, &infoLog[39]);
-    //     throwError(infoLog);
-    // }
-    //
-    // uint32_t fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    // assert( fragmentShader != 0 );
-    //
-    // glShaderSource(fragmentShader, 1, &fragmentShaderText, NULL);
-    // glCompileShader(fragmentShader);
-    //
-    // glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    // if(!success) {
-    //     char infoLog[512] = "Error during fragment shader compilation "; //TODO: string utility
-    //     glGetShaderInfoLog(fragmentShader, 474, NULL, &infoLog[39]);
-    //     throwError(infoLog);
-    // }
+    uint32_t gremioShader = pesiLoadAndCompileShader(GL_FRAGMENT_SHADER, "gremio.glsl");
 
     uint32_t shaderProgram = glCreateProgram();
     assert( shaderProgram != 0 );
@@ -118,56 +93,89 @@ int main(void) {
         throwError(infoLog);
     }
 
+    uint32_t gremioProgram = glCreateProgram();
+    assert( gremioProgram != 0 );
+    glAttachShader(gremioProgram, vertexShader);
+    glAttachShader(gremioProgram, gremioShader);
+    glLinkProgram(gremioProgram);
+
+    glDeleteShader(gremioShader);
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
+    glUseProgram(shaderProgram);
 
     glViewport(0,0,800,600);
-    
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-
     Vector3 vertices[] = {
-                            {0.5f, 0.5f, 0.0f},
-                            {0.5f, -0.5f, 0.0f},
-                            {-0.5f, -0.5f, 0.0f},
-                            {-0.5f, 0.5f, 0.0f}
+                            {-0.25f, 0.0f, 0.0f},
+                            {-0.75f, 0.0f, 0.0f},
+                            {-0.5f, 0.25f, 0.0f},
+                            {0.25f, 0.0f, 0.0f},
+                            {0.75f, 0.0f, 0.0f},
+                            {0.5f, 0.25f, 0.0f},
                         };
 
-    uint32_t indices[] = {
-        0,1,3,
-        1,2,3 };
+    // uint32_t indices[] = {
+    //     1,4,2,
+    //     4,2,5
+    //      };
 
-    uint32_t VBO;
-    glGenBuffers(1, &VBO);
+    uint32_t VBOS[2];
+    glGenBuffers(2, VBOS);
 
+    uint32_t VBO = VBOS[0];
+    uint32_t VBO2 = VBOS[1];
 
-    uint32_t EBO;
-    glGenBuffers(1, &EBO);
+    // uint32_t EBO;
+    // glGenBuffers(1, &EBO);
     
-    uint32_t VAO;
-    glGenVertexArrays(1, &VAO);
+    uint32_t VAOS[2];
+    glGenVertexArrays(2, VAOS);
+    const uint32_t VAO = VAOS[0];
+    const uint32_t VAO2 = VAOS[1];
+
+//First one
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof( vertices ), (void *) vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof( Vector3 ), (void*) 0); 
+    glBufferData(GL_ARRAY_BUFFER, sizeof( Vector3 ) * 6, (void *) vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof( Vector3 ), (void*) 0); 
     glEnableVertexAttribArray(0);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof( indices ), indices, GL_STATIC_DRAW);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    // glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof( indices ), indices, GL_STATIC_DRAW);
 
+//Second one
+    glBindVertexArray(VAO2);
 
-    glUseProgram(shaderProgram);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof( Vector3 ) * 3, (void *) (&vertices[3]), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof( Vector3 ), (void*) 0); 
+    glEnableVertexAttribArray(0);
 
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    glBindVertexArray(VAO); 
+    uint32_t curr = shaderProgram;
+    uint32_t lastInput = GLFW_RELEASE;
+    uint32_t currInput = GLFW_RELEASE;
     while(!glfwWindowShouldClose(window)) {
         processInput(window);
+        currInput = glfwGetKey(window, GLFW_KEY_SPACE);
+        if(currInput != GLFW_RELEASE && lastInput != GLFW_PRESS) {
+            curr ^= shaderProgram ^ gremioProgram;
+            glUseProgram(curr);
+        }
+        lastInput = currInput;
+
         glClear(GL_COLOR_BUFFER_BIT);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        //glDrawArrays(GL_TRIANGLES, 0, 3);
+        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
