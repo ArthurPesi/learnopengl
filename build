@@ -1,5 +1,5 @@
 #!/bin/bash
-link_flags=" -lGL -lglfw"
+link_flags=" -lm -lGL -lglfw"
 error_flags=" -pedantic-errors -Wall -Werror"
 compile_flags=" opengl.c src/glad.c $link_flags $error_flags -o game"
 if [ -z $1 ]; then
