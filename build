@@ -1,6 +1,6 @@
 #!/bin/bash
 link_flags=" -lm -lGL -lglfw"
-error_flags=" -pedantic-errors -Wall -Werror"
+error_flags=" -pedantic-errors -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function -Werror"
 compile_flags=" opengl.c src/glad.c $link_flags $error_flags -o game"
 if [ -z $1 ]; then
     clang $compile_flags
