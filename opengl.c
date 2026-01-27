@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#define M_PI		3.14159265358979323846	/* pi */
 #include <math.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "src/stb_image.h"
@@ -14,6 +13,7 @@
 #define InputIsReleased(button) ((button).isDown == 0)
 
 #define magnitude(pos, neg) ((pos) - (neg))
+#define inputVector(pos, neg) (InputPressed((pos)) - InputPressed((neg))) 
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     glViewport(0,0, width, height);
@@ -52,29 +52,30 @@ typedef union {
     real32 components[4][4];
 } Matrix4f;
 
+Matrix4f createProjection(real32 angle, real32 aspectRatio, real32 near, real32 far) {
+    const real32 tangent = tan(angle/2);
+    Matrix4f projectionMatrix;
+    projectionMatrix.components[0][0] =  1 / (aspectRatio * tangent);
+    projectionMatrix.components[0][1] = 0;
+    projectionMatrix.components[0][2] = 0;
+    projectionMatrix.components[0][3] = 0;
 
-void transform2d(double angle, real32 x, float y, float scale, Matrix4f* matrix) {
-    double sin_ = sin(angle);
-    double cos_ = cos(angle);
-    matrix->components[0][0] = cos_ /scale;
-    matrix->components[0][1] = 0;
-    matrix->components[0][2] = sin_;
-    matrix->components[0][3] = 0;
+    projectionMatrix.components[1][0] = 0;
+    projectionMatrix.components[1][1] = 1 / tangent;
+    projectionMatrix.components[1][2] = 0;
+    projectionMatrix.components[1][3] = 0;
 
-    matrix->components[1][0] = 0;
-    matrix->components[1][1] = 1 / scale;
-    matrix->components[1][2] = 0;
-    matrix->components[1][3] = 0;
+    projectionMatrix.components[2][0] = 0;
+    projectionMatrix.components[2][1] = 0;
+    projectionMatrix.components[2][2] = (-(far + near)) / (far - near);
+    projectionMatrix.components[2][3] = -1;
 
-    matrix->components[2][0] = -sin_ / scale;
-    matrix->components[2][1] = 0;
-    matrix->components[2][2] = cos_;
-    matrix->components[2][3] = 0;
+    projectionMatrix.components[3][0] = 0;
+    projectionMatrix.components[3][1] = 0;
+    projectionMatrix.components[3][2] = -(2 * far * near) / (far - near);
+    projectionMatrix.components[3][3] = 0;
 
-    matrix->components[3][0] = -x;
-    matrix->components[3][1] = -y;
-    matrix->components[3][2] = 0;
-    matrix->components[3][3] = 1;
+    return projectionMatrix;
 }
 
 void processInput(GLFWwindow* window, input* curr, input* prev) {
@@ -161,12 +162,20 @@ int main(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     GLFWwindow *window = glfwCreateWindow(1000, 1000, "LearnOpenGL", NULL, NULL);
-    p_assert(window != NULL); //TODO: testar glfwTerminate
+    //p_assert(window != NULL); //TODO: testar glfwTerminate
     glfwMakeContextCurrent(window);
 
+    // if(monitor) {
+    //     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+    //     glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    // } 
+
+    //TODO: fazer o modo negativo se for suportado e deixar desativar o vsync (glfwSwapInterval)
     p_assert( gladLoadGLLoader( (GLADloadproc) glfwGetProcAddress) );
 
+    glViewport(0,0, 1060, 600);
 
     uint32_t vertexShader = pesiLoadAndCompileShader(GL_VERTEX_SHADER, "vertex.glsl");
     uint32_t fragmentShader = pesiLoadAndCompileShader(GL_FRAGMENT_SHADER, "fragment.glsl");
@@ -187,15 +196,23 @@ int main(void) {
 
     glUseProgram(shaderProgram);
 
-    glViewport(0,0,800,600);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
+    int32_t image_width, image_height, image_nrChannels;
+    uint8_t* texture_data = stbi_load("toddy1.jpeg", &image_width, &image_height, &image_nrChannels, 0);
+    const real32 imageRatio = (real32) image_height / image_width;
+    p_assert( texture_data != 0 );
+    const real32 vertexWidth = 1.7f;
+    const real32 vertexHeight = vertexWidth * imageRatio;
+
+    //TODO: criar um retangulo em espaco local e conseguir mexer ele
     Vector3 vertices[] = {
-        {0.5f, 0.7f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
-        {0.5f, -0.7f, 1.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f},
-        {-0.5f, -0.7f, 1.5f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f},
-        {-0.5f, 0.7f, 2.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+        {vertexWidth, vertexHeight, -8.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+        {vertexWidth, -vertexHeight, -8.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f},
+        {-vertexWidth, -vertexHeight, -8.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f},
+        {-vertexWidth, vertexHeight, -8.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
     };
+
     uint32_t indices[] = {
         0,1,3,
         1,2,3 };
@@ -243,7 +260,7 @@ int main(void) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture1);
 
-    int32_t modo_poggers = GL_REPEAT;
+    int32_t modo_poggers = GL_MIRRORED_REPEAT;
     real32 borderColor[] = {0.0f, 1.0f, 1.0f, 1.0f };
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
@@ -252,9 +269,6 @@ int main(void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    int32_t image_width, image_height, image_nrChannels;
-    uint8_t* texture_data = stbi_load("toddy1.jpeg", &image_width, &image_height, &image_nrChannels, 0);
-    p_assert( texture_data != 0 );
 
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
@@ -284,42 +298,50 @@ int main(void) {
     stbi_image_free(texture_data2);
 
     int timeUniform = glGetUniformLocation(shaderProgram, "time");
-    int rotMatrixUniform = glGetUniformLocation(shaderProgram, "transform");
+    int projectionUniform = glGetUniformLocation(shaderProgram, "projection");
+    int playerUniform = glGetUniformLocation(shaderProgram, "player");
     real32 x = 0.0f;
     real32 y = 0.0f;
+    real32 z = 0.0f;
     real32 rot = 0.0f;
-    real32 scale = 1.0f;
-    Matrix4f rotMatrix = {0};
     input keyboards[2];
-    memset(keyboards, '\0', sizeof( input ) * 2); 
+    memset(keyboards, '\0', sizeof( keyboards )); 
     input* inputBuffer1 = &keyboards[0];
     input* inputBuffer2 = &keyboards[1];
     input* keyboard = inputBuffer1;
     input* lastKeyboard;
+    
+    real32 nearPlane = 1.0f;
+    real32 farPlane = 100.0f;
+    real32 verticalFov = radians(45.0f);
+
 
     while(!glfwWindowShouldClose(window)) {
         lastKeyboard = keyboard;
         keyboard = (keyboard == inputBuffer1) ? inputBuffer2 : inputBuffer1;
         processInput(window, keyboard, lastKeyboard);
-        #define SPEED 0.02f
+        #define SPEED 0.08f
         #define ROT_SPEED 0.06f
-        x += SPEED * magnitude(InputPressed(keyboard->right), InputPressed(keyboard->left));
-        y += SPEED * magnitude(InputPressed(keyboard->up), InputPressed(keyboard->down));
-        rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
-        scale += SPEED * magnitude(InputPressed(keyboard->back), InputPressed(keyboard->front));
 
-        if(InputJustPressed(keyboard->space)) {
-            rot += M_PI;
-        }
-        
-        transform2d(rot, x, y, scale, &rotMatrix);
+        x += SPEED * inputVector(keyboard->right, keyboard->left);
+        y += SPEED * inputVector(keyboard->up, keyboard->down);
+        z += SPEED * inputVector(keyboard->back, keyboard->front);
+        rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
+
+        int viewport_dimensions[4];
+        glGetIntegerv(GL_VIEWPORT, viewport_dimensions);
+        real32 aspectRatio = (real32) 1920/1080;//(real32) viewport_dimensions[2] / viewport_dimensions[3];
+        Matrix4f projection = createProjection(verticalFov, aspectRatio, nearPlane, farPlane); 
+
+        glUniform3f(playerUniform, x, y, z);
         glUniform1f(timeUniform, glfwGetTime());
-        glUniformMatrix4fv(rotMatrixUniform, 1, GL_FALSE, (GLfloat *) &rotMatrix);
+        glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, (GLfloat *) &projection);
 
         glClear(GL_COLOR_BUFFER_BIT);
         //glDrawArrays(GL_TRIANGLES, 0, 3);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
-        glfwSwapBuffers(window);
+
+        glfwSwapBuffers(window); //Swaps buffers only after monitor is done rendering (Enforces FPS)
         glfwPollEvents();
     }
 
