@@ -3,12 +3,15 @@
 
 #define throwError(errorMessage) { printf(" Pesi runtime error:\n%d | %s\n", __LINE__, errorMessage); __builtin_trap(); }
 #define M_PI		3.14159265358979323846	/* pi */
-#define radians(degrees) (degrees) * M_PI / 180
-#define arrayCount(array) sizeof((array)) / sizeof((array)[0])
+#define radians(degrees) ((degrees) * M_PI / 180)
+#define degrees(radians) ((radians) * 180 / M_PI)
+#define arrayCount(array) (sizeof((array)) / sizeof((array)[0]))
 
 #define local static
 #define global static
 #define local_persist static
+#define true 1
+#define false 0
 
 typedef unsigned char bool8;
 typedef unsigned short bool16;

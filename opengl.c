@@ -34,8 +34,8 @@ typedef struct {
     buttonState front;
     buttonState back;
     buttonState space;
+    buttonState esc;
 } input;
-
 
 typedef union {
     struct {
@@ -51,6 +51,12 @@ typedef union {
     Vec4f vectors[4];
     real32 components[4][4];
 } Matrix4f;
+
+typedef struct {
+    real32 x;
+    real32 y;
+    real32 z;
+} Vector3;
 
 Matrix4f createProjection(real32 angle, real32 aspectRatio, real32 near, real32 far) {
     const real32 tangent = tan(angle/2);
@@ -79,9 +85,12 @@ Matrix4f createProjection(real32 angle, real32 aspectRatio, real32 near, real32 
 }
 
 void processInput(GLFWwindow* window, input* curr, input* prev) {
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    if(glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, 1);
     }
+    curr->esc.isDown = glfwGetKey(window, GLFW_KEY_ESCAPE);
+    curr->esc.halfTransitionCount = (curr->esc.isDown != prev->esc.isDown);
+
     curr->up.isDown = glfwGetKey(window, GLFW_KEY_W); 
     curr->up.halfTransitionCount = (curr->up.isDown != prev->up.isDown);
 
@@ -109,12 +118,6 @@ void processInput(GLFWwindow* window, input* curr, input* prev) {
     curr->back.isDown = glfwGetKey(window, GLFW_KEY_K); 
     curr->back.halfTransitionCount = (curr->back.isDown != prev->back.isDown);
 }
-
-typedef struct {
-    real32 x;
-    real32 y;
-    real32 z;
-} Vector3;
 
 
 uint32_t getNullPositionSize(char *str, uint32_t maxSize) {
@@ -156,24 +159,34 @@ uint32_t pesiLoadAndCompileShader(uint32_t shaderType, char *file) {
     return shader;
 }
 
+void enter_fullscreen(GLFWwindow *window, GLFWmonitor* monitor) {
+    if(monitor && window) {
+        const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    } 
+}
+
+
+void exit_fullscreen(GLFWwindow *window, int width, int height) {
+    glfwSetWindowMonitor(window, NULL, 0, 0, width, height, 0);
+}
+
 int main(void) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     GLFWwindow *window = glfwCreateWindow(1000, 1000, "LearnOpenGL", NULL, NULL);
-    //p_assert(window != NULL); //TODO: testar glfwTerminate
+    p_assert(window != NULL); //TODO: testar glfwTerminate
     glfwMakeContextCurrent(window);
-
-    // if(monitor) {
-    //     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    //     glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
-    // } 
 
     //TODO: fazer o modo negativo se for suportado e deixar desativar o vsync (glfwSwapInterval)
     p_assert( gladLoadGLLoader( (GLADloadproc) glfwGetProcAddress) );
+
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    enter_fullscreen(window, monitor);
+    bool8 fullscreen = true;
 
     glViewport(0,0, 1060, 600);
 
@@ -186,7 +199,7 @@ int main(void) {
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
-    int32_t success;//TODO: bool32
+    int32_t success;
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if(!success) {
         char infoLog[512] = "Error during program linking ";
@@ -197,6 +210,7 @@ int main(void) {
     glUseProgram(shaderProgram);
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    //framebuffer_size_callback(window, 800, 600);
 
     int32_t image_width, image_height, image_nrChannels;
     uint8_t* texture_data = stbi_load("toddy1.jpeg", &image_width, &image_height, &image_nrChannels, 0);
@@ -311,15 +325,23 @@ int main(void) {
     input* keyboard = inputBuffer1;
     input* lastKeyboard;
     
-    real32 nearPlane = 1.0f;
-    real32 farPlane = 100.0f;
-    real32 verticalFov = radians(45.0f);
-
+    const real32 nearPlane = 1.0f;
+    const real32 farPlane = 100.0f;
+    const real32 verticalFov = radians(45.0f);
 
     while(!glfwWindowShouldClose(window)) {
         lastKeyboard = keyboard;
         keyboard = (keyboard == inputBuffer1) ? inputBuffer2 : inputBuffer1;
         processInput(window, keyboard, lastKeyboard);
+        if(InputJustPressed(keyboard->esc)) {
+            if(fullscreen) {
+                exit_fullscreen(window, 800, 600);
+                fullscreen = false;
+            } else {
+                enter_fullscreen(window, monitor);
+                fullscreen = true;
+            }
+        }
         #define SPEED 0.08f
         #define ROT_SPEED 0.06f
 
@@ -328,9 +350,10 @@ int main(void) {
         z += SPEED * inputVector(keyboard->back, keyboard->front);
         rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
 
+        //TODO: recalcular projecao so quando necessario
         int viewport_dimensions[4];
         glGetIntegerv(GL_VIEWPORT, viewport_dimensions);
-        real32 aspectRatio = (real32) 1920/1080;//(real32) viewport_dimensions[2] / viewport_dimensions[3];
+        real32 aspectRatio = (real32) viewport_dimensions[2] / viewport_dimensions[3];
         Matrix4f projection = createProjection(verticalFov, aspectRatio, nearPlane, farPlane); 
 
         glUniform3f(playerUniform, x, y, z);
