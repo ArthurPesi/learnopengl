@@ -54,9 +54,29 @@ typedef union {
 } Vec4f;
 
 typedef union {
+    struct {
+        real32 x;
+        real32 y;
+        real32 z;
+    };
+    real32 components[3];
+} Vec3f;
+
+typedef union {
     Vec4f vectors[4];
     real32 components[4][4];
 } Matrix4f;
+
+//functions
+//
+
+Vec3f crossProduct(Vec3f v1, Vec3f v2) {
+    Vec3f result;
+    result.x = v1.y * v2.z - v1.z * v2.y;
+    result.y = v1.z * v2.x - v1.x * v2.z;
+    result.z = v1.x * v2.y - v1.y * v2.x;
+    return result;
+}
 
 Vec4f transform4(Matrix4f matrix, Vec4f vector) {
     Vec4f result;
@@ -405,6 +425,7 @@ int main(void) {
 
     int timeUniform = glGetUniformLocation(shaderProgram, "time");
     int projectionUniform = glGetUniformLocation(shaderProgram, "projection");
+    int modelUniform = glGetUniformLocation(shaderProgram, "model");
     int viewUniform = glGetUniformLocation(shaderProgram, "view");
     int playerUniform = glGetUniformLocation(shaderProgram, "player");
     real32 x = 0.0f;
@@ -421,6 +442,12 @@ int main(void) {
     const real32 nearPlane = 1.0f;
     const real32 farPlane = 100.0f;
     const real32 verticalFov = radians(45.0f);
+    real32 cubeLocations[5][3] = {{0.0f, 2.0f, 12.0f},
+                                    {3.0f, -2.0f, 7.0f},
+                                    {-1.0f, 4.0f, 12.0f},
+                                    {-3.0f, -2.0f, 10.0f},
+                                    {0.0f, 0.0f, 5.0f} };
+
 
     while(!glfwWindowShouldClose(window)) {
         lastKeyboard = keyboard;
@@ -454,9 +481,13 @@ int main(void) {
         glUniform1f(timeUniform, glfwGetTime());
         glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, (GLfloat *) &projection);
         glUniformMatrix4fv(viewUniform, 1, GL_FALSE, (GLfloat *) &viewMatrix);
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for(int i = 0; i < 5; i++) {
+            Matrix4f modelMatrix = translate4(cubeLocations[i][0], cubeLocations[i][1], cubeLocations[i][2]);
+            glUniformMatrix4fv(modelUniform, 1, GL_FALSE, (GLfloat *) &modelMatrix);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
         //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
 
         glfwSwapBuffers(window); //Swaps buffers only after monitor is done rendering (Enforces FPS)
