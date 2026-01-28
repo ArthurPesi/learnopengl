@@ -37,6 +37,12 @@ typedef struct {
     buttonState esc;
 } input;
 
+typedef struct {
+    real32 x;
+    real32 y;
+    real32 z;
+} Vector3;
+
 typedef union {
     struct {
         real32 x;
@@ -52,11 +58,61 @@ typedef union {
     real32 components[4][4];
 } Matrix4f;
 
-typedef struct {
-    real32 x;
-    real32 y;
-    real32 z;
-} Vector3;
+Vec4f transform4(Matrix4f matrix, Vec4f vector) {
+    Vec4f result;
+
+    for(int i = 0; i < 4; i++) {
+        real32 sum = 0;
+        for(int j = 0; j < 4; j++) {
+            sum += matrix.components[j][i] * vector.components[i];
+        }
+        result.components[i] = sum;
+    }
+    return result;
+}
+
+Matrix4f compose4(Matrix4f m1, Matrix4f m2) {
+    Matrix4f result;
+
+    for(int k = 0; k < 4; k++) {
+        for(int i = 0; i < 4; i++) {
+            real32 sum = 0;
+            for(int j = 0; j < 4; j++) {
+                sum += m1.components[j][i] * m2.components[k][j];
+            }
+            result.components[k][i] = sum;
+        }
+    }
+    return result;
+}
+
+Matrix4f identityMatrix4(void) {
+    Matrix4f result;
+    memset(&result, '\0', sizeof(result));
+    for(int i = 0; i < 4; i++) {
+        result.components[i][i] = 1;
+    }
+    return result;
+}
+
+Matrix4f translate4(real32 x, real32 y, real32 z) {
+    Matrix4f result = identityMatrix4();
+    result.components[3][0] = -x;
+    result.components[3][1] = -y;
+    result.components[3][2] = -z;
+    result.components[3][3] = 1;
+    return result;
+}
+
+Matrix4f scaleMatrix4(real32 scale) {
+    Matrix4f result;
+    memset(&result, '\0', sizeof(result));
+    for(int i = 0; i < 3; i++) {
+        result.components[i][i] = scale;
+    }
+    result.components[3][3] = 1;
+    return result;
+}
 
 Matrix4f createProjection(real32 angle, real32 aspectRatio, real32 near, real32 far) {
     const real32 tangent = tan(angle/2);
@@ -96,7 +152,7 @@ void processInput(GLFWwindow* window, input* curr, input* prev) {
 
     curr->left.isDown = glfwGetKey(window, GLFW_KEY_A);
     curr->left.halfTransitionCount = (curr->left.isDown != prev->left.isDown);
-    
+
     curr->down.isDown = glfwGetKey(window, GLFW_KEY_S);
     curr->down.halfTransitionCount = (curr->down.isDown != prev->down.isDown);
 
@@ -111,7 +167,7 @@ void processInput(GLFWwindow* window, input* curr, input* prev) {
 
     curr->e.isDown = glfwGetKey(window, GLFW_KEY_E); 
     curr->e.halfTransitionCount = (curr->e.isDown != prev->e.isDown);
-    
+
     curr->front.isDown = glfwGetKey(window, GLFW_KEY_I); 
     curr->front.halfTransitionCount = (curr->front.isDown != prev->front.isDown);
 
@@ -137,7 +193,7 @@ uint32_t pesiLoadAndCompileShader(uint32_t shaderType, char *file) {
     p_assert(buffer != NULL);
     fread(buffer, 1, length, shaderFile);
     fclose(shaderFile);
-    
+
 
     uint32_t shader = glCreateShader(shaderType);
     p_assert( shader != 0 );
@@ -172,6 +228,22 @@ void exit_fullscreen(GLFWwindow *window, int width, int height) {
 }
 
 int main(void) {
+    // Matrix4f teste1, teste2;
+    // teste1 = identityMatrix4();
+    // memset(&teste2, '\0', sizeof(Matrix4f));
+    // teste1.components[3][0] = 6.0f;
+    // teste1.components[3][1] = 9.0f;
+    // teste1.components[3][2] = 4.2f;
+    // teste1.components[3][3] = 1.0f;
+    //
+    // teste2 = scaleMatrix4(3);
+    //
+    // Matrix4f teste = compose4(teste1, teste2);
+    // for(int i = 0; i < 4; i++) {
+    //     printf("%f %f %f %f\n", teste.components[0][i], teste.components[1][i], teste.components[2][i], teste.components[3][i]);
+    // }
+
+
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -187,7 +259,6 @@ int main(void) {
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     enter_fullscreen(window, monitor);
     bool8 fullscreen = true;
-
     glViewport(0,0, 1060, 600);
 
     uint32_t vertexShader = pesiLoadAndCompileShader(GL_VERTEX_SHADER, "vertex.glsl");
@@ -221,10 +292,10 @@ int main(void) {
 
     //TODO: criar um retangulo em espaco local e conseguir mexer ele
     Vector3 vertices[] = {
-        {vertexWidth, vertexHeight, -8.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
-        {vertexWidth, -vertexHeight, -8.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f},
-        {-vertexWidth, -vertexHeight, -8.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f},
-        {-vertexWidth, vertexHeight, -8.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+        {vertexWidth, vertexHeight, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+        {vertexWidth, -vertexHeight, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f},
+        {-vertexWidth, -vertexHeight, 0.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f},
+        {-vertexWidth, vertexHeight, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
     };
 
     uint32_t indices[] = {
@@ -313,10 +384,11 @@ int main(void) {
 
     int timeUniform = glGetUniformLocation(shaderProgram, "time");
     int projectionUniform = glGetUniformLocation(shaderProgram, "projection");
+    int viewUniform = glGetUniformLocation(shaderProgram, "view");
     int playerUniform = glGetUniformLocation(shaderProgram, "player");
     real32 x = 0.0f;
     real32 y = 0.0f;
-    real32 z = 0.0f;
+    real32 z = 7.0f;
     real32 rot = 0.0f;
     input keyboards[2];
     memset(keyboards, '\0', sizeof( keyboards )); 
@@ -354,11 +426,13 @@ int main(void) {
         int viewport_dimensions[4];
         glGetIntegerv(GL_VIEWPORT, viewport_dimensions);
         real32 aspectRatio = (real32) viewport_dimensions[2] / viewport_dimensions[3];
+        Matrix4f viewMatrix = translate4(x,y,z);
         Matrix4f projection = createProjection(verticalFov, aspectRatio, nearPlane, farPlane); 
 
         glUniform3f(playerUniform, x, y, z);
         glUniform1f(timeUniform, glfwGetTime());
         glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, (GLfloat *) &projection);
+        glUniformMatrix4fv(viewUniform, 1, GL_FALSE, (GLfloat *) &viewMatrix);
 
         glClear(GL_COLOR_BUFFER_BIT);
         //glDrawArrays(GL_TRIANGLES, 0, 3);
