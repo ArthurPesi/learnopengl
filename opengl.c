@@ -228,22 +228,6 @@ void exit_fullscreen(GLFWwindow *window, int width, int height) {
 }
 
 int main(void) {
-    // Matrix4f teste1, teste2;
-    // teste1 = identityMatrix4();
-    // memset(&teste2, '\0', sizeof(Matrix4f));
-    // teste1.components[3][0] = 6.0f;
-    // teste1.components[3][1] = 9.0f;
-    // teste1.components[3][2] = 4.2f;
-    // teste1.components[3][3] = 1.0f;
-    //
-    // teste2 = scaleMatrix4(3);
-    //
-    // Matrix4f teste = compose4(teste1, teste2);
-    // for(int i = 0; i < 4; i++) {
-    //     printf("%f %f %f %f\n", teste.components[0][i], teste.components[1][i], teste.components[2][i], teste.components[3][i]);
-    // }
-
-
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -261,6 +245,8 @@ int main(void) {
     bool8 fullscreen = true;
     glViewport(0,0, 1060, 600);
 
+    //Opengl configuration goes here
+    glEnable(GL_DEPTH_TEST);
     uint32_t vertexShader = pesiLoadAndCompileShader(GL_VERTEX_SHADER, "vertex.glsl");
     uint32_t fragmentShader = pesiLoadAndCompileShader(GL_FRAGMENT_SHADER, "fragment.glsl");
 
@@ -291,12 +277,50 @@ int main(void) {
     const real32 vertexHeight = vertexWidth * imageRatio;
 
     //TODO: criar um retangulo em espaco local e conseguir mexer ele
-    Vector3 vertices[] = {
+    Vector3 verticesRectangle[] = {
         {vertexWidth, vertexHeight, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
         {vertexWidth, -vertexHeight, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f},
         {-vertexWidth, -vertexHeight, 0.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f},
         {-vertexWidth, vertexHeight, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
     };
+    float verticesCube[] = {
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+        0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f
+};
 
     uint32_t indices[] = {
         0,1,3,
@@ -318,15 +342,12 @@ int main(void) {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof( Vector3 ) * 12, (void *) vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof( Vector3 ) * 3, (void*) 0); 
+    glBufferData(GL_ARRAY_BUFFER, sizeof( verticesCube ), (void *) verticesCube, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof( real32 ) * 5, (void*) 0); 
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof( Vector3 ) * 3, (void*) sizeof( Vector3 )); 
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof( real32 ) * 5, (void*) (sizeof( real32 ) * 3)); 
     glEnableVertexAttribArray(1);
-
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof( Vector3 ) * 3, (void*) (sizeof( Vector3 ) * 2 ) ); 
-    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof( indices ), indices, GL_STATIC_DRAW);
@@ -434,9 +455,9 @@ int main(void) {
         glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, (GLfloat *) &projection);
         glUniformMatrix4fv(viewUniform, 1, GL_FALSE, (GLfloat *) &viewMatrix);
 
-        glClear(GL_COLOR_BUFFER_BIT);
-        //glDrawArrays(GL_TRIANGLES, 0, 3);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
 
         glfwSwapBuffers(window); //Swaps buffers only after monitor is done rendering (Enforces FPS)
         glfwPollEvents();
