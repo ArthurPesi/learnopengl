@@ -70,6 +70,23 @@ typedef union {
 //functions
 //
 
+void getNormalizedVector(real32 *vector, real32 *result, size_t size) {
+    real32 magnitude = 0;
+    for(size_t i = 0; i < size; i++) {
+        magnitude += vector[i] * vector[i];
+    }
+    magnitude = (real32) sqrt(magnitude);
+
+    if(result == NULL) {
+        result = vector;
+    }
+
+    for(size_t i = 0; i < size; i++) {
+        result[i] = vector[i] / magnitude;
+    }
+}
+
+#define normalize(vector) getNormalizedVector(vector, NULL, arrayCount(vector))
 Vec3f crossProduct(Vec3f v1, Vec3f v2) {
     Vec3f result;
     result.x = v1.y * v2.z - v1.z * v2.y;
