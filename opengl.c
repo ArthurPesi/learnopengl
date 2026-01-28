@@ -87,12 +87,11 @@ void getNormalizedVector(real32 *vector, real32 *result, size_t size) {
 }
 
 #define normalize(vector) getNormalizedVector(vector, NULL, arrayCount(vector))
-Vec3f crossProduct(Vec3f v1, Vec3f v2) {
-    Vec3f result;
-    result.x = v1.y * v2.z - v1.z * v2.y;
-    result.y = v1.z * v2.x - v1.x * v2.z;
-    result.z = v1.x * v2.y - v1.y * v2.x;
-    return result;
+
+void crossProduct(real32* v1, real32* v2, real32* result) {
+    result[0] = v1[1] * v2[2] - v1[2] * v2[1];
+    result[1] = v1[2] * v2[0] - v1[0] * v2[2];
+    result[2] = v1[0] * v2[1] - v1[1] * v2[0];
 }
 
 Vec4f transform4(Matrix4f matrix, Vec4f vector) {
@@ -445,9 +444,9 @@ int main(void) {
     int modelUniform = glGetUniformLocation(shaderProgram, "model");
     int viewUniform = glGetUniformLocation(shaderProgram, "view");
     int playerUniform = glGetUniformLocation(shaderProgram, "player");
-    real32 x = 0.0f;
-    real32 y = 0.0f;
-    real32 z = 7.0f;
+    real32 cameraPos[] = {0.0f, 0.0f, 10.0f};
+    real32 cameraTarget[] = {0.0f, 0.0f, 0.0f};
+
     real32 rot = 0.0f;
     input keyboards[2];
     memset(keyboards, '\0', sizeof( keyboards )); 
@@ -459,13 +458,15 @@ int main(void) {
     const real32 nearPlane = 1.0f;
     const real32 farPlane = 100.0f;
     const real32 verticalFov = radians(45.0f);
-    real32 cubeLocations[5][3] = {{0.0f, 2.0f, 12.0f},
+    const real32 upVector[] = {0.0f, 1.0f, 0.0f};
+    real32 cubeLocations[5][3] = {{0.0f, 0.0f, 0.0f},
                                     {3.0f, -2.0f, 7.0f},
                                     {-1.0f, 4.0f, 12.0f},
                                     {-3.0f, -2.0f, 10.0f},
                                     {0.0f, 0.0f, 5.0f} };
 
 
+    //main loop
     while(!glfwWindowShouldClose(window)) {
         lastKeyboard = keyboard;
         keyboard = (keyboard == inputBuffer1) ? inputBuffer2 : inputBuffer1;
@@ -482,22 +483,50 @@ int main(void) {
         #define SPEED 0.08f
         #define ROT_SPEED 0.06f
 
-        x += SPEED * inputVector(keyboard->right, keyboard->left);
-        y += SPEED * inputVector(keyboard->up, keyboard->down);
-        z += SPEED * inputVector(keyboard->back, keyboard->front);
-        rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
+        cameraPos[0] -= SPEED * inputVector(keyboard->right, keyboard->left);
+        cameraPos[1] -= SPEED * inputVector(keyboard->up, keyboard->down);
+        cameraPos[2] -= SPEED * inputVector(keyboard->back, keyboard->front);
+        real32 cameraFrontVector[3];
+        getNormalizedVector(cameraPos, cameraFrontVector, arrayCount( cameraPos ) );
+        real32 rightCameraVector[3];
+        real32 upCameraVector[3];
+        crossProduct(cameraFrontVector, (real32 *) upVector, rightCameraVector);
+        normalize(rightCameraVector);
+        crossProduct(cameraFrontVector, rightCameraVector, upCameraVector);
+        //rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
+        Matrix4f cameraTranslation = translate4(cameraPos[0],cameraPos[1],cameraPos[2]);
+        Matrix4f cameraRotation;
+        memset(&cameraRotation, '\0', sizeof( cameraRotation) );
+        for(int i = 0; i < 3; i++) {
+            cameraRotation.components[i][0] = rightCameraVector[i];
+            cameraRotation.components[i][1] = upCameraVector[i];
+            cameraRotation.components[i][2] = cameraFrontVector[i];
+        }
+        cameraRotation.components[3][3] = 1;
+
+        Matrix4f viewMatrix = compose4(cameraRotation, cameraTranslation);
+        //viewMatrix.components[0][0] = 1.0f;
+        for(int i = 0; i < 4; i++) {
+            for(int j = 0; j < 4; j++) {
+                printf("%f ", cameraRotation.components[j][i]);
+            }
+            printf("\n");
+        }
+        printf("finished\n");
+        glUniformMatrix4fv(viewUniform, 1, GL_FALSE, (GLfloat *) &viewMatrix);
 
         //TODO: recalcular projecao so quando necessario
         int viewport_dimensions[4];
         glGetIntegerv(GL_VIEWPORT, viewport_dimensions);
         real32 aspectRatio = (real32) viewport_dimensions[2] / viewport_dimensions[3];
-        Matrix4f viewMatrix = translate4(x,y,z);
+
         Matrix4f projection = createProjection(verticalFov, aspectRatio, nearPlane, farPlane); 
 
-        glUniform3f(playerUniform, x, y, z);
         glUniform1f(timeUniform, glfwGetTime());
         glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, (GLfloat *) &projection);
-        glUniformMatrix4fv(viewUniform, 1, GL_FALSE, (GLfloat *) &viewMatrix);
+
+
+        //render
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         for(int i = 0; i < 5; i++) {
             Matrix4f modelMatrix = translate4(cubeLocations[i][0], cubeLocations[i][1], cubeLocations[i][2]);
