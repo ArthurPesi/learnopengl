@@ -111,13 +111,13 @@ Vec4f transform4(Matrix4f matrix, Vec4f vector) {
 Matrix4f compose4(Matrix4f m1, Matrix4f m2) {
     Matrix4f result;
 
-    for(int k = 0; k < 4; k++) {
-        for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < 4; i++) {
+        for(int j = 0; j < 4; j++) {
             real32 sum = 0;
-            for(int j = 0; j < 4; j++) {
-                sum += m1.components[j][i] * m2.components[k][j];
+            for(int k = 0; k < 4; k++) {
+                sum += m1.components[k][j] * m2.components[i][k];
             }
-            result.components[k][i] = sum;
+            result.components[i][j] = sum;
         }
     }
     return result;
