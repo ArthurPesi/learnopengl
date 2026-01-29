@@ -35,6 +35,7 @@ typedef struct {
     buttonState back;
     buttonState space;
     buttonState esc;
+    buttonState ctrl;
 } input;
 
 typedef struct {
@@ -70,6 +71,26 @@ typedef union {
 //functions
 //
 
+global real32 lastX = 1280.0f, lastY = 540.0f;
+global real32 yaw = 90.0f, pitch = 0.0f;
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    const real32 sense = -0.04f;
+    real32 xOffset = sense * (xpos - lastX);
+    real32 yOffset = sense * (ypos - lastY);
+    lastX = xpos;
+    lastY = ypos;
+
+    yaw += xOffset;
+    pitch += yOffset;
+    if(pitch > 49.0f) {
+        pitch = 49.0f;
+    }
+    if(pitch < -49.0f) {
+        pitch = -49.0f;
+    }
+
+}
 void vectorAdd(real32* v1, real32* v2, real32* result, size_t size) {
     for(size_t i = 0; i < size; i++) {
         result[i] = v1[i] + v2[i];
@@ -196,6 +217,9 @@ void processInput(GLFWwindow* window, input* curr, input* prev) {
     curr->esc.isDown = glfwGetKey(window, GLFW_KEY_ESCAPE);
     curr->esc.halfTransitionCount = (curr->esc.isDown != prev->esc.isDown);
 
+    curr->ctrl.isDown = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL);
+    curr->ctrl.halfTransitionCount = (curr->ctrl.isDown != prev->ctrl.isDown);
+
     curr->up.isDown = glfwGetKey(window, GLFW_KEY_W); 
     curr->up.halfTransitionCount = (curr->up.isDown != prev->up.isDown);
 
@@ -286,6 +310,7 @@ int main(void) {
     p_assert(window != NULL); //TODO: testar glfwTerminate
     glfwMakeContextCurrent(window);
 
+
     //TODO: fazer o modo negativo se for suportado e deixar desativar o vsync (glfwSwapInterval)
     p_assert( gladLoadGLLoader( (GLADloadproc) glfwGetProcAddress) );
 
@@ -293,6 +318,9 @@ int main(void) {
     enter_fullscreen(window, monitor);
     bool8 fullscreen = true;
     glViewport(0,0, 1060, 600);
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     //Opengl configuration goes here
     glEnable(GL_DEPTH_TEST);
@@ -479,8 +507,11 @@ int main(void) {
                                     {0.0f, 0.0f, 5.0f} };
 
 
-    real32 cameraFrontVector[3] = {0.4f, 0.0f, 1.0f};
+
+    real32 cameraFrontVector[3] = {0.4f, 0.2f, 1.0f};
     normalize(cameraFrontVector);
+    real32 deltaTime = 0.0f;
+    real32 lastTime = glfwGetTime();
 
     //main loop
     while(!glfwWindowShouldClose(window)) {
@@ -501,9 +532,15 @@ int main(void) {
         }
 
         //Camera
-        #define SPEED 0.09f
-        #define ROT_SPEED 0.06f
-        #define printVec(vector) printf("%f %f %f\n", (vector)[0], (vector)[1], (vector)[2]);
+        #define SPEED (6.9f * deltaTime)
+        #define ROT_SPEED (3.0f * deltaTime)
+
+
+        real32 direction[3];
+        direction[0] = cos(radians(yaw)) * cos(radians(pitch));
+        direction[1] = sin(radians(pitch));
+        direction[2] = sin(radians(yaw)) * cos(radians(pitch));
+        getNormalizedVector(direction, cameraFrontVector, 3);
         
         real32 rightCameraVector[3];
         real32 upCameraVector[3];
@@ -513,13 +550,17 @@ int main(void) {
         
         real32 frontAxis = inputVector(keyboard->down, keyboard->up);
         real32 sideAxis = inputVector(keyboard->right, keyboard->left);
+        real32 upAxis = inputVector(keyboard->ctrl, keyboard->space);
         real32 frontMove[3];
         real32 sideMove[3];
+        real32 upMove[3];
         scaleVector(cameraFrontVector, frontMove, 3, frontAxis);
         scaleVector(rightCameraVector, sideMove, 3, sideAxis);
+        scaleVector((real32 *) upVector, upMove, 3, upAxis);
 
         real32 totalMove[3];
         vectorAdd(frontMove, sideMove, totalMove, 3);
+        vectorAdd(totalMove, upMove, totalMove, 3);
         normalize(totalMove);
         scaleVector(totalMove, totalMove, 3, SPEED);
 
@@ -560,6 +601,9 @@ int main(void) {
             glUniformMatrix4fv(modelUniform, 1, GL_FALSE, (GLfloat *) &modelMatrix);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
+        real32 currentTime = glfwGetTime();
+        deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
 
         //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) 0);
 
