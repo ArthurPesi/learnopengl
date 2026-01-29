@@ -51,7 +51,7 @@ typedef union {
         real32 w;
     };
     real32 components[4];
-} Vec4f;
+} Vec4f;//TODO: converter tudo em arrays
 
 typedef union {
     struct {
@@ -70,6 +70,16 @@ typedef union {
 //functions
 //
 
+void vectorAdd(real32* v1, real32* v2, real32* result, size_t size) {
+    for(size_t i = 0; i < size; i++) {
+        result[i] = v1[i] + v2[i];
+    }
+}
+void scaleVector(real32* vector, real32* result, size_t size, real32 scalar) {
+    for(size_t i = 0; i < size; i++) {
+        result[i] = vector[i] * scalar;
+    }
+}
 void getNormalizedVector(real32 *vector, real32 *result, size_t size) {
     real32 magnitude = 0;
     for(size_t i = 0; i < size; i++) {
@@ -81,6 +91,9 @@ void getNormalizedVector(real32 *vector, real32 *result, size_t size) {
         result = vector;
     }
 
+    if(magnitude == 0) {
+        return;
+    }
     for(size_t i = 0; i < size; i++) {
         result[i] = vector[i] / magnitude;
     }
@@ -447,7 +460,7 @@ int main(void) {
     real32 cameraPos[] = {0.0f, 0.0f, 10.0f};
     real32 cameraTarget[] = {0.0f, 0.0f, 0.0f};
 
-    real32 rot = 0.0f;
+    real32 rot = 1.0f;
     input keyboards[2];
     memset(keyboards, '\0', sizeof( keyboards )); 
     input* inputBuffer1 = &keyboards[0];
@@ -466,11 +479,17 @@ int main(void) {
                                     {0.0f, 0.0f, 5.0f} };
 
 
+    real32 cameraFrontVector[3] = {0.4f, 0.0f, 1.0f};
+    normalize(cameraFrontVector);
+
     //main loop
     while(!glfwWindowShouldClose(window)) {
+        //Input
         lastKeyboard = keyboard;
         keyboard = (keyboard == inputBuffer1) ? inputBuffer2 : inputBuffer1;
         processInput(window, keyboard, lastKeyboard);
+
+        //Update
         if(InputJustPressed(keyboard->esc)) {
             if(fullscreen) {
                 exit_fullscreen(window, 800, 600);
@@ -480,20 +499,33 @@ int main(void) {
                 fullscreen = true;
             }
         }
-        #define SPEED 0.08f
-        #define ROT_SPEED 0.06f
 
-        cameraPos[0] -= SPEED * inputVector(keyboard->right, keyboard->left);
-        cameraPos[1] -= SPEED * inputVector(keyboard->up, keyboard->down);
-        cameraPos[2] -= SPEED * inputVector(keyboard->back, keyboard->front);
-        real32 cameraFrontVector[3];
-        getNormalizedVector(cameraPos, cameraFrontVector, arrayCount( cameraPos ) );
+        //Camera
+        #define SPEED 0.09f
+        #define ROT_SPEED 0.06f
+        #define printVec(vector) printf("%f %f %f\n", (vector)[0], (vector)[1], (vector)[2]);
+        
         real32 rightCameraVector[3];
         real32 upCameraVector[3];
         crossProduct(cameraFrontVector, (real32 *) upVector, rightCameraVector);
         normalize(rightCameraVector);
         crossProduct(cameraFrontVector, rightCameraVector, upCameraVector);
-        //rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
+        
+        real32 frontAxis = inputVector(keyboard->down, keyboard->up);
+        real32 sideAxis = inputVector(keyboard->right, keyboard->left);
+        real32 frontMove[3];
+        real32 sideMove[3];
+        scaleVector(cameraFrontVector, frontMove, 3, frontAxis);
+        scaleVector(rightCameraVector, sideMove, 3, sideAxis);
+
+        real32 totalMove[3];
+        vectorAdd(frontMove, sideMove, totalMove, 3);
+        normalize(totalMove);
+        scaleVector(totalMove, totalMove, 3, SPEED);
+
+        vectorAdd(cameraPos, totalMove, cameraPos, 3);
+
+        rot += ROT_SPEED * magnitude(InputPressed(keyboard->q), InputPressed(keyboard->e));
         Matrix4f cameraTranslation = translate4(cameraPos[0],cameraPos[1],cameraPos[2]);
         Matrix4f cameraRotation;
         memset(&cameraRotation, '\0', sizeof( cameraRotation) );
@@ -505,16 +537,10 @@ int main(void) {
         cameraRotation.components[3][3] = 1;
 
         Matrix4f viewMatrix = compose4(cameraRotation, cameraTranslation);
-        //viewMatrix.components[0][0] = 1.0f;
-        for(int i = 0; i < 4; i++) {
-            for(int j = 0; j < 4; j++) {
-                printf("%f ", cameraRotation.components[j][i]);
-            }
-            printf("\n");
-        }
-        printf("finished\n");
+
         glUniformMatrix4fv(viewUniform, 1, GL_FALSE, (GLfloat *) &viewMatrix);
 
+        //Projection
         //TODO: recalcular projecao so quando necessario
         int viewport_dimensions[4];
         glGetIntegerv(GL_VIEWPORT, viewport_dimensions);
@@ -530,6 +556,7 @@ int main(void) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         for(int i = 0; i < 5; i++) {
             Matrix4f modelMatrix = translate4(cubeLocations[i][0], cubeLocations[i][1], cubeLocations[i][2]);
+            modelMatrix = compose4(modelMatrix, scaleMatrix4(rot));
             glUniformMatrix4fv(modelUniform, 1, GL_FALSE, (GLfloat *) &modelMatrix);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
