@@ -15,6 +15,11 @@
 #define magnitude(pos, neg) ((pos) - (neg))
 #define inputVector(pos, neg) (InputPressed((pos)) - InputPressed((neg))) 
 
+
+#define printArraySize(array, size) printf(#array "\n"); for(size_t i = 0; i < (size); i++) { printf("%zu: %f\n", i, array[i]); }
+
+#define printArray(array) printArraySize((array), sizeof(array) /sizeof(array[0]));
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     glViewport(0,0, width, height);
 }
@@ -71,23 +76,23 @@ typedef union {
 //functions
 //
 
-global real32 lastX = 1280.0f, lastY = 540.0f;
-global real32 yaw = 90.0f, pitch = 0.0f;
+global_variable real32 lastX = 1280.0f, lastY = 540.0f;
+global_variable real32 yaw = 90.0f, pitch = 0.0f;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-    const real32 sense = -0.04f;
+    const real32 sense = 0.035f;
     real32 xOffset = sense * (xpos - lastX);
     real32 yOffset = sense * (ypos - lastY);
     lastX = xpos;
     lastY = ypos;
 
-    yaw += xOffset;
-    pitch += yOffset;
-    if(pitch > 49.0f) {
-        pitch = 49.0f;
+    yaw -= xOffset;
+    pitch -= yOffset;
+    if(pitch > 69.0f) {
+        pitch = 69.0f;
     }
-    if(pitch < -49.0f) {
-        pitch = -49.0f;
+    if(pitch < -69.0f) {
+        pitch = -69.0f;
     }
 
 }
@@ -96,31 +101,99 @@ void vectorAdd(real32* v1, real32* v2, real32* result, size_t size) {
         result[i] = v1[i] + v2[i];
     }
 }
+
+void vectorSubtract(real32* v1, real32* v2, real32* result, size_t size) {
+    for(size_t i = 0; i < size; i++) {
+        result[i] = v1[i] - v2[i];
+    }
+}
+
 void scaleVector(real32* vector, real32* result, size_t size, real32 scalar) {
     for(size_t i = 0; i < size; i++) {
         result[i] = vector[i] * scalar;
     }
 }
+
+
 void getNormalizedVector(real32 *vector, real32 *result, size_t size) {
     real32 magnitude = 0;
     for(size_t i = 0; i < size; i++) {
         magnitude += vector[i] * vector[i];
     }
+
+    if(magnitude == 0) {
+        return;
+    }
+
     magnitude = (real32) sqrt(magnitude);
 
     if(result == NULL) {
         result = vector;
     }
 
-    if(magnitude == 0) {
-        return;
-    }
     for(size_t i = 0; i < size; i++) {
         result[i] = vector[i] / magnitude;
     }
 }
 
 #define normalize(vector) getNormalizedVector(vector, NULL, arrayCount(vector))
+
+void rotateTo(real32* result, real32* from, real32* to, real32 amount) {
+    printf("%f\n", amount);
+    real32 difference[4];
+    vectorSubtract(to, from, difference, 4);
+    scaleVector(difference, difference, 4, amount);
+    vectorAdd(from, difference, result, 4);
+    getNormalizedVector(result, NULL, 4);
+}
+
+void quaternionToMatrix(Matrix4f* output, real32* q) { //Assumes normalized quaternion
+    const real32 s = 2;
+    const real32 w = q[0], i = q[1], j = q[2], k = q[3];
+
+    const real32 is = i * s, js = j * s, ks = k * s;
+
+    //x = i; y = j; z = k
+    const real32 wi = w * is, wj = w * js, wk = w * ks;
+    const real32 ii = i * is, ij = i * js, ik = i * ks;
+    const real32 jj = j * js, jk = j * ks, kk = k * ks;
+    
+    output->components[0][0] = 1.0f - (jj + kk);
+    output->components[0][1] = ij + wk;
+    output->components[0][2] = ik - wj;
+    output->components[0][3] = 0.0f;
+
+    output->components[1][0] = ij - wk;
+    output->components[1][1] = 1.0f - (ii + kk);
+    output->components[1][2] = jk + wi;
+    output->components[1][3] = 0.0f;
+
+    output->components[2][0] = ik + wj;
+    output->components[2][1] = jk - wi;
+    output->components[2][2] = 1.0f - (ii + jj);
+    output->components[2][3] = 0.0f;
+
+    output->components[3][0] = 0.0f;
+    output->components[3][1] = 0.0f;
+    output->components[3][2] = 0.0f;
+    output->components[3][3] = 1.0f;
+}
+
+void quaternion(real32* quat, real32 angle, real32* axis) {
+    const real32 halfAngle = angle/2;
+    getNormalizedVector(axis, &quat[1], 3);
+    //TODO: lidar com o angulo maior que 180
+    scaleVector(&quat[1], &quat[1], 3, sin(halfAngle));
+    quat[0] = cos(halfAngle);
+}
+
+Matrix4f rotationMatrix(real32 angle, real32* axis) { /*Angle in radians, axis is a 3 numbers array representing the axis to rotate around */
+    Matrix4f output;
+    real32 quat[4];
+    quaternion(quat, angle, axis);
+    quaternionToMatrix(&output, quat);
+    return output;
+}
 
 void crossProduct(real32* v1, real32* v2, real32* result) {
     result[0] = v1[1] * v2[2] - v1[2] * v2[1];
@@ -252,7 +325,7 @@ void processInput(GLFWwindow* window, input* curr, input* prev) {
 uint32_t getNullPositionSize(char *str, uint32_t maxSize) {
     uint32_t count = 0;
     char i = 0;
-    while((i = *(str++)) && ++count < maxSize) {}
+    while(++count < maxSize && (i = *(str++))) {}
     return count;
 }
 
@@ -275,6 +348,7 @@ uint32_t pesiLoadAndCompileShader(uint32_t shaderType, char *file) {
 
     glShaderSource(shader, 1, &shaderSource, &length);
     glCompileShader(shader);
+    free(buffer);
 
     int32_t success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
@@ -294,7 +368,6 @@ void enter_fullscreen(GLFWwindow *window, GLFWmonitor* monitor) {
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
     } 
 }
-
 
 void exit_fullscreen(GLFWwindow *window, int width, int height) {
     glfwSetWindowMonitor(window, NULL, 0, 0, width, height, 0);
@@ -319,11 +392,13 @@ int main(void) {
     bool8 fullscreen = true;
     glViewport(0,0, 1060, 600);
 
+    //glfw configuration
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouse_callback);
 
     //Opengl configuration goes here
     glEnable(GL_DEPTH_TEST);
+
     uint32_t vertexShader = pesiLoadAndCompileShader(GL_VERTEX_SHADER, "vertex.glsl");
     uint32_t fragmentShader = pesiLoadAndCompileShader(GL_FRAGMENT_SHADER, "fragment.glsl");
 
@@ -452,8 +527,6 @@ int main(void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-
-
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -488,23 +561,23 @@ int main(void) {
     real32 cameraPos[] = {0.0f, 0.0f, 10.0f};
     real32 cameraTarget[] = {0.0f, 0.0f, 0.0f};
 
-    real32 rot = 1.0f;
+    real32 rot = 1.3f;
     input keyboards[2];
     memset(keyboards, '\0', sizeof( keyboards )); 
     input* inputBuffer1 = &keyboards[0];
     input* inputBuffer2 = &keyboards[1];
     input* keyboard = inputBuffer1;
     input* lastKeyboard;
-    
+
     const real32 nearPlane = 1.0f;
     const real32 farPlane = 100.0f;
     const real32 verticalFov = radians(45.0f);
     const real32 upVector[] = {0.0f, 1.0f, 0.0f};
     real32 cubeLocations[5][3] = {{0.0f, 0.0f, 0.0f},
-                                    {3.0f, -2.0f, 7.0f},
-                                    {-1.0f, 4.0f, 12.0f},
-                                    {-3.0f, -2.0f, 10.0f},
-                                    {0.0f, 0.0f, 5.0f} };
+        {3.0f, -2.0f, 7.0f},
+        {-1.0f, 4.0f, 12.0f},
+        {-3.0f, -2.0f, 10.0f},
+        {0.0f, 0.0f, 5.0f} };
 
 
 
@@ -512,6 +585,9 @@ int main(void) {
     normalize(cameraFrontVector);
     real32 deltaTime = 0.0f;
     real32 lastTime = glfwGetTime();
+    const real32 axis[3] = {0.0f, 1.0f, 1.0f};
+    int32 count = 0;
+    real32 origin[4] = {0.0f, 1.0f, 0.0f, 0.0f};
 
     //main loop
     while(!glfwWindowShouldClose(window)) {
@@ -540,6 +616,7 @@ int main(void) {
         direction[0] = cos(radians(yaw)) * cos(radians(pitch));
         direction[1] = sin(radians(pitch));
         direction[2] = sin(radians(yaw)) * cos(radians(pitch));
+
         getNormalizedVector(direction, cameraFrontVector, 3);
         
         real32 rightCameraVector[3];
@@ -595,9 +672,23 @@ int main(void) {
 
         //render
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        Matrix4f modelMatrix = translate4(cubeLocations[0][0], cubeLocations[0][1], cubeLocations[0][2]);
+        real32 angle = count / 120.0f;
+        real32 axiss[5][3] = {{1.0f, 0.0f, 0.0f},
+                            {1.0f, 1.0f, 0.0f},
+                            {0.0f, 1.0f, 1.0f},
+                            {0.5f, -1.0f, 0.0f},
+                            {0.0f, 0.5f, 1.0f}};
         for(int i = 0; i < 5; i++) {
             Matrix4f modelMatrix = translate4(cubeLocations[i][0], cubeLocations[i][1], cubeLocations[i][2]);
-            modelMatrix = compose4(modelMatrix, scaleMatrix4(rot));
+            real32 destination[4];
+            quaternion(destination, radians(45.0f), axiss[i]);
+            real32 rotation[4];
+            rotateTo(rotation, origin, destination, angle);
+            //printArray(rotation);
+            Matrix4f rotation45;
+            quaternionToMatrix(&rotation45, rotation);//rotationMatrix(radians(angle), axiss[i]);
+            modelMatrix = compose4(modelMatrix, rotation45);
             glUniformMatrix4fv(modelUniform, 1, GL_FALSE, (GLfloat *) &modelMatrix);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
@@ -609,6 +700,11 @@ int main(void) {
 
         glfwSwapBuffers(window); //Swaps buffers only after monitor is done rendering (Enforces FPS)
         glfwPollEvents();
+        count++;
+        if(count > 129) {
+            count = 0;
+        }
+        printf("Frame\n");
     }
 
     glfwTerminate();

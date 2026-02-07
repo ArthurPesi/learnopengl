@@ -8,7 +8,7 @@
 #define arrayCount(array) (sizeof((array)) / sizeof((array)[0]))
 
 #define local static
-#define global static
+#define global_variable static
 #define local_persist static
 #define true 1
 #define false 0
